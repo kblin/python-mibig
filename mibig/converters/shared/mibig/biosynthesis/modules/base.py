@@ -8,9 +8,25 @@ from mibig.errors import ValidationError, ValidationErrorInfo
 from .cal import CAL
 from .nrps import NrpsTypeI
 from .other import Other
-from .pks import PksIterative, PksModular, PksTransAt
+from .pks import (
+    PksIterative,
+    PksModular,
+    PksModularStarter,
+    PksTransAt,
+    PksTransAtStarter,
+)
 
-ExtraInfo = CAL | NrpsTypeI | Other | PksIterative | PksModular | PksTransAt
+ExtraInfo = (
+    CAL
+    | NrpsTypeI
+    | Other
+    | PksIterative
+    | PksModular
+    | PksTransAt
+    | PksModularStarter
+    | PksTransAtStarter
+)
+
 
 class NcaEvidence:
     method: str
@@ -22,7 +38,9 @@ class NcaEvidence:
         "Activity assay",
     )
 
-    def __init__(self, method: str, references: list[Citation], validate: bool = True) -> None:
+    def __init__(
+        self, method: str, references: list[Citation], validate: bool = True
+    ) -> None:
         self.method = method
         self.references = references
 
@@ -37,7 +55,11 @@ class NcaEvidence:
         errors = []
 
         if self.method not in self.VALID_METHODS:
-            errors.append(ValidationErrorInfo("NcaEvidence.method", f"Invalid method {self.method}"))
+            errors.append(
+                ValidationErrorInfo(
+                    "NcaEvidence.method", f"Invalid method {self.method}"
+                )
+            )
 
         errors.extend(validate_citation_list(self.references))
 
@@ -51,7 +73,7 @@ class NcaEvidence:
     def to_json(self) -> dict[str, Any]:
         return {
             "method": self.method,
-            "references": [r.to_json() for r in self.references]
+            "references": [r.to_json() for r in self.references],
         }
 
 
@@ -61,8 +83,14 @@ class NonCanonicalActivity:
     non_elongating: bool | None = None
     skipped: bool | None = None
 
-    def __init__(self, evidence: list[NcaEvidence], iterations: int | None = None, non_elongating: bool | None = None,
-                 skipped: bool | None = None, validate: bool = True) -> None:
+    def __init__(
+        self,
+        evidence: list[NcaEvidence],
+        iterations: int | None = None,
+        non_elongating: bool | None = None,
+        skipped: bool | None = None,
+        validate: bool = True,
+    ) -> None:
         self.evidence = evidence
         self.iterations = iterations
         self.non_elongating = non_elongating
@@ -105,7 +133,6 @@ class NonCanonicalActivity:
         return ret
 
 
-
 class ModuleType(Enum):
     CAL = "cal"
     NRPS_TYPE1 = "nrps-type1"
@@ -114,6 +141,8 @@ class ModuleType(Enum):
     PKS_ITERATIVE = "pks-iterative"
     PKS_MODULAR = "pks-modular"
     PKS_TRANS_AT = "pks-trans-at"
+    PKS_MODULAR_STARTER = "pks-modular-starter"
+    PKS_TRANS_AT_STARTER = "pks-trans-at-starter"
 
 
 MAPPING = {
@@ -124,11 +153,13 @@ MAPPING = {
     ModuleType.PKS_ITERATIVE: PksIterative,
     ModuleType.PKS_MODULAR: PksModular,
     ModuleType.PKS_TRANS_AT: PksTransAt,
+    ModuleType.PKS_MODULAR_STARTER: PksModularStarter,
+    ModuleType.PKS_TRANS_AT_STARTER: PksTransAtStarter,
 }
 
 
 class Module:
-    module_type: str
+    module_type: ModuleType
     name: str
     genes: list[GeneId]
     active: bool
@@ -136,8 +167,18 @@ class Module:
     integrated_monomers: list[Monomer]
     comment: str | None
 
-    def __init__(self, module_type: str, name: str, genes: list[GeneId], active: bool, extra_info: ExtraInfo,
-                 integrated_monomers: list[Monomer], comment: str | None = None, validate: bool = True, **kwargs) -> None:
+    def __init__(
+        self,
+        module_type: ModuleType,
+        name: str,
+        genes: list[GeneId],
+        active: bool,
+        extra_info: ExtraInfo,
+        integrated_monomers: list[Monomer],
+        comment: str | None = None,
+        validate: bool = True,
+        **kwargs,
+    ) -> None:
         self.module_type = module_type
         self.name = name
         self.genes = genes
@@ -168,7 +209,7 @@ class Module:
 
     @classmethod
     def from_json(cls, raw: dict[str, Any], **kwargs) -> Self:
-        module_type = raw["type"]
+        module_type = ModuleType(raw["type"])
         extra_info = MAPPING[ModuleType(module_type)].from_json(raw, **kwargs)
 
         return cls(
@@ -178,20 +219,25 @@ class Module:
             active=raw["active"],
             extra_info=extra_info,
             comment=raw.get("comment"),
-            integrated_monomers=[Monomer.from_json(monomer) for monomer in raw.get("integrated_monomers", [])],
+            integrated_monomers=[
+                Monomer.from_json(monomer)
+                for monomer in raw.get("integrated_monomers", [])
+            ],
             **kwargs,
         )
 
     def to_json(self) -> dict[str, Any]:
         ret = {
-            "type": self.module_type,
+            "type": self.module_type.value,
             "name": self.name,
             "genes": [gene.to_json() for gene in self.genes],
             "active": self.active,
             **self.extra_info.to_json(),
         }
         if self.integrated_monomers:
-            ret["integrated_monomers"] = [monomer.to_json() for monomer in self.integrated_monomers]
+            ret["integrated_monomers"] = [
+                monomer.to_json() for monomer in self.integrated_monomers
+            ]
 
         if self.comment:
             ret["comment"] = self.comment
